@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dokumentasi Kegiatan Babinsa</title>
+    <link rel="stylesheet" href="styles.css" />
+
+    <!-- ============================================================
+         MAPPING KODE LAMPIRAN STATIS PER DESA
+         A = Lampiran Rincian Anggaran
+         B = Lampiran Dokumentasi Foto
+         ============================================================ -->
+    <script>
+      const KODE_DESA = {
+        "Ambengan":     { A: "A",   B: "B"   },
+        "Pegayaman":    { A: "A1",  B: "B1"  },
+        "Gitgit":       { A: "A2",  B: "B2"  },
+        "Tegallinggah": { A: "A3",  B: "B3"  },
+        "Panji":        { A: "A4",  B: "B4"  },
+        "Sukasada":     { A: "A5",  B: "B5"  },
+        "Wanagiri":     { A: "A6",  B: "B6"  },
+        "Selat":        { A: "A7",  B: "B7"  },
+        "Kayu Putih":   { A: "A8",  B: "B8"  },
+        "Padang Bulia": { A: "A9",  B: "B9"  },
+        "Pancasari":    { A: "A10", B: "B10" },
+        "Silangjana":   { A: "A11", B: "B11" },
+        "Panji Anom":   { A: "A12", B: "B12" },
+        "Pegadungan":   { A: "A13", B: "B13" },
+        "Sambangan":    { A: "A14", B: "B14" }
+      };
+
+      function applyVillage(village) {
+        console.log("[applyVillage] desa:", village);
+        const k = KODE_DESA[village];
+        if (!k) {
+          console.warn("[applyVillage] desa tidak ada di mapping:", village);
+          return;
+        }
+
+        // Lampiran B (foto) — kode saja
+        const elB = document.getElementById("attachment-code");
+        if (elB) elB.textContent = k.B;
+
+        // Lampiran A (anggaran) — kode saja
+        document.querySelectorAll(".budget-attachment-code").forEach(function (el) {
+          el.textContent = k.A;
+        });
+
+        // Tanda tangan Babinsa — nama desa DINAMIS
+        document.querySelectorAll(".signature-village").forEach(function (el) {
+          el.textContent = village;
+        });
+
+        // Nama desa di lampiran & judul TIDAK diubah — tetap statis "Sukasada"
+      }
+
+      // ============================================================
+      // ISI DROPDOWN DESA — SEKALI SAJA, SETELAH SEMUA SCRIPT SELESAI
+      // ============================================================
+      window.addEventListener("load", function () {
+        const sel = document.getElementById("report-village");
+        if (!sel) {
+          console.error("[init] #report-village tidak ditemukan!");
+          return;
+        }
+
+        // Kosongkan dulu (buang apapun yang mungkin sudah diisi script lain)
+        sel.innerHTML = "";
+
+        // Placeholder
+        const ph = document.createElement("option");
+        ph.value = "";
+        ph.disabled = true;
+        ph.selected = true;
+        ph.textContent = "-Pilih desa/kelurahan-";
+        sel.appendChild(ph);
+
+        // Isi semua desa dari mapping
+        Object.keys(KODE_DESA).forEach(function (village) {
+          const opt = document.createElement("option");
+          opt.value = village;
+          opt.textContent = village;
+          sel.appendChild(opt);
+        });
+
+        // Pasang listener change
+        sel.addEventListener("change", function (e) {
+          applyVillage(e.target.value);
+        });
+
+        console.log("[final] dropdown bersih:", sel.options.length, "option");
+      });
+    </script>
+  </head>
+
+  <body>
+
+    <!-- ================= KONTROL ================= -->
+    <div class="date-controls" aria-label="Pilih bulan, tahun, dan wilayah laporan secara berurutan">
+      <div class="filter-control">
+        <select id="report-month" aria-label="Pilih bulan laporan">
+          <option value="" selected disabled>-Pilih bulan-</option>
+        </select>
+      </div>
+      <div id="year-control" class="filter-control" hidden>
+        <select id="report-year" aria-label="Pilih tahun laporan">
+          <option value="" selected disabled>-Pilih tahun-</option>
+        </select>
+      </div>
+
+      <!-- DROPDOWN DESA — KOSONG, DIISI OLEH JS DI HEAD -->
+      <div id="village-control" class="filter-control">
+        <select id="report-village" aria-label="Pilih desa atau kelurahan"></select>
+      </div>
+
+      <select id="report-type" aria-label="Pilih lampiran">
+        <option value="" selected>-Pilih lampiran-</option>
+        <option value="budget">Rincian dukungan anggaran</option>
+        <option value="photos">Dokumentasi foto</option>
+      </select>
+      <button id="print-button" class="print-button" type="button">Cetak / Simpan PDF</button>
+      <span id="photo-status" role="status">Foto dimuat otomatis sesuai pilihan laporan</span>
+    </div>
+
+    <!-- ================= DIALOG ================= -->
+    <dialog id="photo-source-dialog" class="photo-source-dialog" aria-labelledby="photo-source-title">
+      <form method="dialog">
+        <button class="dialog-close" type="submit" aria-label="Tutup">×</button>
+      </form>
+      <h2 id="photo-source-title">Pilih sumber foto</h2>
+      <p>Pilih folder, satu atau beberapa ZIP, atau beberapa file gambar.</p>
+      <div class="photo-source-options">
+        <button type="button" data-photo-source="folder">Folder proyek (termasuk ZIP)</button>
+        <button type="button" data-photo-source="zip">Satu atau beberapa file ZIP</button>
+        <button type="button" data-photo-source="images">Satu atau beberapa file gambar</button>
+      </div>
+    </dialog>
+
+    <dialog id="selection-warning-dialog" class="photo-source-dialog" aria-labelledby="selection-warning-title">
+      <form method="dialog">
+        <button class="dialog-close" type="submit" aria-label="Tutup">×</button>
+      </form>
+      <h2 id="selection-warning-title">Lengkapi periode laporan</h2>
+      <p id="selection-warning-message">Pilih bulan dan tahun terlebih dahulu sebelum memilih wilayah dan memuat foto.</p>
+      <form method="dialog">
+        <button class="warning-confirm" type="submit">Mengerti</button>
+      </form>
+    </dialog>
+
+    <!-- ================= INPUT FILE (hidden) ================= -->
+    <input id="local-folder-input" type="file" webkitdirectory directory multiple aria-label="Pilih folder yang berisi foto laporan" hidden />
+    <input id="photo-files-input" type="file" accept="image/*,.zip,application/zip" multiple aria-label="Pilih foto atau arsip ZIP untuk dokumentasi foto" hidden />
+    <input id="budget-text-input" type="file" accept=".txt,text/plain" aria-label="Pilih file TXT berisi tanggal dan uraian kegiatan" hidden />
+
+    <!-- ============================================================
+         LAMPIRAN B : DOKUMENTASI FOTO
+         ============================================================ -->
+    <main class="document report-canvas" id="photo-document">
+      <section class="page page-one">
+        <header class="document-header">
+          <div class="unit-heading">
+            <strong>KOMANDO DISTRIK MILITER 1609/BULELENG</strong>
+            <strong>KOMANDO RAYON MILITER 1609-05</strong>
+          </div>
+          <div class="attachment">
+            <span>Lampiran : <span id="attachment-code">B</span> (Dokumentasi kegiatan Dukungan Operasional Babinsa) pada</span>
+            <span>Laplakgiat Dukungan Operasional Babinsa Koramil 1609-05/Sukasada</span>
+            <span id="attachment-period"></span>
+          </div>
+        </header>
+
+        <h1 class="report-title">
+          DOKUMENTASI KEGIATAN DUKUNGAN OPERASIONAL BABINSA<br />
+          KEGIATAN DUKUNGAN OPERASIONAL BABINSA KORAMIL 1609-05/SUKASADA<br />
+          BULAN <span id="title-period"></span>
+        </h1>
+
+        <div class="photo-grid first-grid" aria-label="Dokumentasi kegiatan 1 sampai 6">
+          <div class="photo-row">
+            <article class="photo-card">
+              <div class="photo-number">1</div>
+              <div class="photo-slot"></div>
+            </article>
+            <article class="photo-card">
+              <div class="photo-number">2</div>
+              <div class="photo-slot"></div>
+            </article>
+            <article class="photo-card">
+              <div class="photo-number">3</div>
+              <div class="photo-slot"></div>
+            </article>
+          </div>
+          <div class="photo-row">
+            <article class="photo-card">
+              <div class="photo-number">4</div>
+              <div class="photo-slot"></div>
+            </article>
+            <article class="photo-card">
+              <div class="photo-number">5</div>
+              <div class="photo-slot"></div>
+            </article>
+            <article class="photo-card">
+              <div class="photo-number">6</div>
+              <div class="photo-slot"></div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="page page-two">
+        <div class="page-number">2</div>
+        <div class="photo-grid second-grid" aria-label="Dokumentasi kegiatan 7 sampai 9">
+          <article class="photo-card">
+            <div class="photo-number">7</div>
+            <div class="photo-slot"></div>
+          </article>
+          <article class="photo-card">
+            <div class="photo-number">8</div>
+            <div class="photo-slot"></div>
+          </article>
+          <article class="photo-card">
+            <div class="photo-number">9</div>
+            <div class="photo-slot"></div>
+          </article>
+        </div>
+
+        <footer class="signatures">
+          <!-- KIRI: Komandan Koramil — STATIS -->
+          <div class="signature-block left-signature">
+            <p>Mengetahui,<br />Komandan Koramil 1609-05/Sukasada</p>
+            <div class="signature-space" id="commander-signature-space">
+              <img class="stamp-image" id="unit-stamp-image" alt="Stempel satuan" hidden />
+              <img class="signature-image commander-signature-image" id="commander-signature-image" alt="Tanda tangan Komandan Koramil" hidden />
+            </div>
+            <strong>I Nyoman Arya Kepakisan</strong>
+            <span>Kapten Inf NRP 3910357550170</span>
+          </div>
+
+          <!-- KANAN: Babinsa — nama desa DINAMIS -->
+          <div class="signature-block right-signature">
+            <p>
+              Sukasada, <span id="signature-date" class="signature-date"></span><br />
+              Babinsa Koramil 1609-05/<span class="signature-village">Sukasada</span>,
+            </p>
+            <div class="signature-space babinsa-signature-space" id="babinsa-signature-space"></div>
+            <strong id="babinsa-name" class="babinsa-name"></strong>
+            <span><span id="babinsa-rank" class="babinsa-rank"></span> NRP <span id="babinsa-nrp" class="babinsa-nrp"></span></span>
+          </div>
+        </footer>
+      </section>
+    </main>
+
+    <!-- ============================================================
+         LAMPIRAN A : RINCIAN DUKUNGAN ANGGARAN
+         ============================================================ -->
+    <main class="document budget-document report-canvas" id="budget-document" hidden>
+      <section class="page budget-page budget-page-one">
+        <header class="budget-header">
+          <div class="unit-heading">
+            <strong>KOMANDO DISTRIK MILITER 1609/BULELENG</strong>
+            <strong>KOMANDO RAYON MILITER 1609-05</strong>
+          </div>
+          <div class="budget-attachment">
+            <span>Lampiran : <span class="budget-attachment-code">A</span> (Rincian dukungan anggaran) pada</span>
+            <span>Laplakgiat Dukungan Operasional Babinsa Koramil 1609-05/Sukasada</span>
+            <span>Bulan <span class="budget-attachment-period"></span></span>
+          </div>
+        </header>
+
+        <h1 class="budget-title">
+          RINCIAN DUKUNGAN ANGGARAN<br />
+          KEGIATAN DUKUNGAN OPERASIONAL BABINSA KORAMIL 1609-05/SUKASADA<br />
+          BULAN <span class="budget-title-period"></span>
+        </h1>
+
+        <table class="budget-table" aria-label="Rincian dukungan anggaran halaman satu">
+          <colgroup><col /><col /><col /><col /><col /></colgroup>
+          <thead>
+            <tr>
+              <th>NO</th>
+              <th>HARI/TANGGAL</th>
+              <th>URAIAN KEGIATAN</th>
+              <th>PENGGUNAAN DANA (RP)</th>
+              <th>KETERANGAN</th>
+            </tr>
+            <tr class="budget-column-numbers" aria-hidden="true">
+              <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
+            </tr>
+          </thead>
+          <tbody id="budget-rows-first"></tbody>
+        </table>
+      </section>
+
+      <section class="page budget-page budget-page-two">
+        <div class="page-number">2</div>
+        <table class="budget-table" aria-label="Rincian dukungan anggaran halaman dua">
+          <colgroup><col /><col /><col /><col /><col /></colgroup>
+          <thead>
+            <tr class="budget-column-numbers" aria-hidden="true">
+              <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
+            </tr>
+          </thead>
+          <tbody id="budget-rows-second"></tbody>
+        </table>
+
+        <footer class="signatures budget-signatures">
+          <!-- KIRI: Komandan Koramil — STATIS -->
+          <div class="signature-block left-signature">
+            <p>Mengetahui,<br />Komandan Koramil 1609-05/Sukasada</p>
+            <div class="signature-space" id="budget-commander-signature-space">
+              <img class="stamp-image" id="budget-unit-stamp-image" alt="Stempel satuan" hidden />
+              <img class="signature-image commander-signature-image" id="budget-commander-signature-image" alt="Tanda tangan Komandan Koramil" hidden />
+              <span class="asset-placeholder signature-placeholder"></span>
+            </div>
+            <strong>I Nyoman Arya Kepakisan</strong>
+            <span>Kapten Inf NRP 3910357550170</span>
+          </div>
+
+          <!-- KANAN: Babinsa — nama desa DINAMIS -->
+          <div class="signature-block right-signature">
+            <p>
+              Sukasada, <span class="signature-date"></span><br />
+              Babinsa Koramil 1609-05/<span class="signature-village">Sukasada</span>,
+            </p>
+            <div class="signature-space babinsa-signature-space" id="budget-babinsa-signature-space"></div>
+            <strong class="babinsa-name"></strong>
+            <span><span class="babinsa-rank"></span> NRP <span class="babinsa-nrp"></span></span>
+          </div>
+        </footer>
+      </section>
+    </main>
+
+    <!-- ================= SCRIPT ================= -->
+    <script src="data/report-data.js"></script>
+    <script src="zip-reader.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
