@@ -63,7 +63,7 @@
       const extraLength = view.getUint16(offset + 30, true), commentLength = view.getUint16(offset + 32, true);
       const localOffset = view.getUint32(offset + 42, true), entryEnd = offset + 46 + nameLength + extraLength + commentLength;
       if (entryEnd > dirStart + dirSize) throw new Error("Entri file ZIP terpotong.");
-      let name = new TextDecoder(flags & 0x0800 ? "utf-8" : "windows-1252", { fatal: true }).decode(bytes.subarray(offset + 46, offset + 46 + nameLength)).replace(/\\/g, "/");
+      const name = new TextDecoder(flags & 0x0800 ? "utf-8" : "windows-1252", { fatal: true }).decode(bytes.subarray(offset + 46, offset + 46 + nameLength)).replace(/\\/g, "/");
       offset = entryEnd;
       const ext = name.split(".").pop().toLowerCase();
       if (name.endsWith("/") || !allowed.has(ext)) continue;
@@ -100,11 +100,7 @@
     const named = name.match(new RegExp(`(?:^|\\D)(\\d{1,2})\\s+(${monthPattern})\\s+(\\d{4})(?:\\D|$)`, "i"));
     if (named) return validDate(Number(named[3]), monthNames.findIndex((month) => month.toLowerCase() === named[2]) + 1, Number(named[1]));
     const patterns = [/(?:^|\D)(\d{1,2})[-_. ](\d{1,2})[-_. ](\d{4})(?:\D|$)/, /(?:^|\D)(\d{4})[-_. ](\d{1,2})[-_. ](\d{1,2})(?:\D|$)/, /(?:^|\D)(\d{2})(\d{2})(\d{4})(?:\D|$)/, /(?:^|\D)(\d{4})(\d{2})(\d{2})(?:\D|$)/];
-    for (const [i, pattern] of patterns.entries()) {
-      const m = name.match(pattern); if (!m) continue;
-      const [a, b, c] = m.slice(1).map(Number), [year, month, day] = i === 1 || i === 3 ? [a, b, c] : [c, b, a];
-      const date = validDate(year, month, day); if (date) return date;
-    }
+    for (const [i, pattern] of patterns.entries()) { const m = name.match(pattern); if (!m) continue; const [a, b, c] = m.slice(1).map(Number), [year, month, day] = i === 1 || i === 3 ? [a, b, c] : [c, b, a]; const date = validDate(year, month, day); if (date) return date; }
     return null;
   }
   function mapPhotoEntries(entries, slotCount) {
@@ -113,15 +109,8 @@
     const dated = sorted.map((entry) => ({ entry, date: dateFromPhotoFilename(entry.name || entry.path.split("/").pop()) })).filter((item) => item.date).sort((a, b) => a.date - b.date || a.entry.path.localeCompare(b.entry.path, "id", { numeric: true, sensitivity: "base" }));
     dated.slice(0, slotCount).forEach(({ entry }, index) => photosByNumber.set(index + 1, entry));
     const datedSet = new Set(dated.map(({ entry }) => entry));
-    sorted.forEach((entry) => {
-      if (datedSet.has(entry)) return;
-      const number = photoNumber(entry.path);
-      if (number === null) overflow.push(entry);
-      else if (photosByNumber.has(number)) { duplicateNumbers.add(number); overflow.push(entry); }
-      else photosByNumber.set(number, entry);
-    });
-    let next = 1;
-    overflow.forEach((entry) => { while (photosByNumber.has(next) && next <= slotCount) next++; if (next <= slotCount) photosByNumber.set(next++, entry); });
+    sorted.forEach((entry) => { if (datedSet.has(entry)) return; const number = photoNumber(entry.path); if (number === null) overflow.push(entry); else if (photosByNumber.has(number)) { duplicateNumbers.add(number); overflow.push(entry); } else photosByNumber.set(number, entry); });
+    let next = 1; overflow.forEach((entry) => { while (photosByNumber.has(next) && next <= slotCount) next++; if (next <= slotCount) photosByNumber.set(next++, entry); });
     return { photosByNumber, duplicateNumbers, ignoredCount: Math.max(0, entries.length - photosByNumber.size) };
   }
   function fillActivities(items) {
@@ -136,70 +125,52 @@
   }
   function importText(text) {
     const activities = text.split(/\r?\n/).filter((line) => line.trim()).map((line) => line.split(line.includes("\t") ? "\t" : "|").map((part) => part.trim())).filter((parts) => parts[0] && parts[1]);
-    fillActivities(activities);
-    return activities.length;
+    fillActivities(activities); return activities.length;
   }
   function importJson(text) {
-    const data = JSON.parse(text);
-    if (!data || typeof data !== "object") throw new Error("JSON harus berisi objek atau daftar data.");
+    const data = JSON.parse(text); if (!data || typeof data !== "object") throw new Error("JSON harus berisi objek atau daftar data.");
     const period = data.period && typeof data.period === "object" ? data.period : data;
     const yearSelect = document.querySelector("#report-year"), monthSelect = document.querySelector("#report-month"), villageSelect = document.querySelector("#report-village");
     if (period.year != null && yearSelect) { yearSelect.value = String(period.year); yearSelect.dispatchEvent(new Event("change", { bubbles: true })); }
-    if (period.month != null && monthSelect) {
-      const month = typeof period.month === "number" ? period.month - 1 : monthNames.findIndex((name) => name.toLowerCase() === String(period.month).toLowerCase());
-      if (month >= 0 && month < 12) { monthSelect.value = String(month); monthSelect.dispatchEvent(new Event("change", { bubbles: true })); }
-    }
-    const village = period.village || period.desa || period.kelurahan;
-    if (village && villageSelect) { villageSelect.value = String(village); villageSelect.dispatchEvent(new Event("change", { bubbles: true })); }
+    if (period.month != null && monthSelect) { const month = typeof period.month === "number" ? period.month - 1 : monthNames.findIndex((name) => name.toLowerCase() === String(period.month).toLowerCase()); if (month >= 0 && month < 12) { monthSelect.value = String(month); monthSelect.dispatchEvent(new Event("change", { bubbles: true })); } }
+    const village = period.village || period.desa || period.kelurahan; if (village && villageSelect) { villageSelect.value = String(village); villageSelect.dispatchEvent(new Event("change", { bubbles: true })); }
     const person = data.babinsa && typeof data.babinsa === "object" ? data.babinsa : data;
-    for (const [keys, selector] of [[ ["name", "nama"], ".babinsa-name" ], [ ["rank", "pangkat"], ".babinsa-rank" ], [ ["nrp"], ".babinsa-nrp" ]]) {
-      const key = keys.find((candidate) => person[candidate] != null);
-      if (key) document.querySelectorAll(selector).forEach((element) => { element.textContent = String(person[key]); });
-    }
-    const activities = data.activities || data.kegiatan || data.rows || data.rincian || (Array.isArray(data) ? data : null);
-    if (activities) fillActivities(activities);
+    for (const [keys, selector] of [[["name", "nama"], ".babinsa-name"], [["rank", "pangkat"], ".babinsa-rank"], [["nrp"], ".babinsa-nrp"]]) { const key = keys.find((candidate) => person[candidate] != null); if (key) document.querySelectorAll(selector).forEach((element) => { element.textContent = String(person[key]); }); }
+    const activities = data.activities || data.kegiatan || data.rows || data.rincian || (Array.isArray(data) ? data : null); if (activities) fillActivities(activities);
   }
   async function importZip(files) {
-    const archives = [...files].filter((file) => /\.zip$/i.test(file.name));
-    let imageEntries = [], jsonCount = 0, textCount = 0;
+    const archives = [...files].filter((file) => /\.zip$/i.test(file.name)); let imageEntries = [], jsonCount = 0, textCount = 0;
     for (const archive of archives) {
       const entries = await readArchiveEntries(archive, contentTypes);
       imageEntries.push(...entries.filter((entry) => entry.blob.type.startsWith("image/")));
       for (const entry of entries.filter((item) => /\.json$/i.test(item.name))) { importJson(entry.text); jsonCount++; }
-      for (const entry of entries.filter((item) => /\.txt$/i.test(item.name))) { textCount += importText(entry.text); }
+      for (const entry of entries.filter((item) => /\.txt$/i.test(item.name))) textCount += importText(entry.text);
     }
     const status = document.querySelector("#photo-status");
     if (status && archives.length) status.textContent = `${archives.length} ZIP dibaca; ${imageEntries.length} gambar, ${jsonCount} JSON, ${textCount} kegiatan TXT dimuat.`;
   }
   window.ZipImageReader = { readImageEntries: (archive) => readArchiveEntries(archive, imageTypes), readContentEntries: (archive) => readArchiveEntries(archive, contentTypes), mapPhotoEntries, dateFromPhotoFilename };
 
-  // Ganti menu pilihan lampiran dengan satu tombol yang langsung memilih ZIP.
   document.addEventListener("DOMContentLoaded", () => {
     const reportType = document.querySelector("#report-type");
-    const fileInput = document.querySelector("#photo-files-input");
+    const folderInput = document.querySelector("#local-folder-input");
     const printButton = document.querySelector("#print-button");
     if (reportType) reportType.hidden = true;
-    if (!fileInput || !printButton || document.querySelector("#upload-zip-button")) return;
+    if (!folderInput || !printButton || document.querySelector("#upload-zip-button")) return;
     const button = document.createElement("button");
     button.id = "upload-zip-button";
     button.type = "button";
     button.className = "print-button";
-    button.textContent = "Upload ZIP";
-    button.setAttribute("aria-label", "Upload ZIP berisi gambar, JSON, dan TXT");
+    button.textContent = "Pilih Folder ZIP";
+    button.setAttribute("aria-label", "Pilih folder yang berisi satu atau beberapa file ZIP");
     printButton.before(button);
-    button.addEventListener("click", () => {
-      fileInput.value = "";
-      fileInput.accept = ".zip,application/zip";
-      fileInput.multiple = false;
-      fileInput.click();
-    });
+    button.addEventListener("click", () => { folderInput.value = ""; folderInput.click(); });
   });
   document.addEventListener("change", (event) => {
     const input = event.target;
     if (!input || !["local-folder-input", "photo-files-input"].includes(input.id)) return;
     void importZip(Array.from(input.files || [])).catch((error) => {
-      const status = document.querySelector("#photo-status");
-      if (status) status.textContent = `ZIP gagal dibaca: ${error.message}`;
+      const status = document.querySelector("#photo-status"); if (status) status.textContent = `ZIP gagal dibaca: ${error.message}`;
       console.error("Gagal membaca isi ZIP:", error);
     });
   });
